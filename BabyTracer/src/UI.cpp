@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <vector>
 #include <iostream>
+#include <chrono>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
-
 
 #include "glfw-3.2.1/deps/linmath.h"
 
@@ -25,6 +26,7 @@ float mCamdistance = 5;
 float mLookatAngle = 0;
 float mLookatZ = 0;
 bool mCameraMoved = false;
+int mUseLowRes = true;
 MyVertex pvertex[4];
 
 
@@ -55,12 +57,13 @@ static const char* fragment_shader_text =
 "{\n"
 "    gl_FragColor = vec4(color*texture(samplerID,texCoord).rgb, 1.0);\n"
 "}\n";
-void createTexture(Image * image)
+
+void createTexture(Image & image)
 {
-   if (image->mGlID == 0) {
-      glGenTextures(1, &image->mGlID);
+   if (image.mGlID == 0) {
+      glGenTextures(1, &image.mGlID);
    }
-   glBindTexture(GL_TEXTURE_2D, image->mGlID);
+   glBindTexture(GL_TEXTURE_2D, image.mGlID);
    // set the texture wrapping/filtering options (on the currently bound texture object)
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
@@ -68,8 +71,8 @@ void createTexture(Image * image)
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
    // load and generate the texture
 
-   Pixel * pixel_data = image->toPixelData();
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image->mWidth, image->mHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, (unsigned char*)&pixel_data[0].rgb[0]);
+   Pixel * pixel_data = image.toPixelData();
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.mWidth, image.mHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, (unsigned char*)&pixel_data[0].rgb[0]);
    glGenerateMipmap(GL_TEXTURE_2D);
  
 
@@ -133,9 +136,6 @@ void handeInput(GLFWwindow *window)
    }
 }
 
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
-{
-}
 
 
 void checkShader(unsigned int shader)
@@ -186,7 +186,7 @@ void checkShaderProgram(unsigned int shader_program)
    return;
 }
 
-void LaunchUI(RayTracer * rt, Image * image )
+void LaunchUI(RayTracer * rt, Image * image)
 {
 
    pvertex[0].pos = glm::vec3(2.0f, 1.0f, 0.0f);
@@ -217,7 +217,6 @@ void LaunchUI(RayTracer * rt, Image * image )
    }
 
    //glfwSetKeyCallback(window, key_callback);
-   glfwSetMouseButtonCallback(window, mouse_button_callback);
 
    glfwMakeContextCurrent(window);
    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
@@ -269,10 +268,22 @@ void LaunchUI(RayTracer * rt, Image * image )
    //vcol_location = glGetAttribLocation(program, "vCol");
 
    float timer = 0;
-   createTexture(image);
+   createTexture(*image);
    mLookatAngle = 0;// rt->mCamera.mLookFrom[0];
    mLookatZ = rt->mCamera.mLookFrom[1];
+   int lowW = image->mWidth / 2.0f;
+   int lowH = image->mHeight / 2.0f;
+   if (lowW % 2 != 0) {
+      lowW++;
+   }
+   if (lowH % 2 != 0) {
+      lowH++;
+   }
+   Image lowResImage(lowW, lowH);
+   Image * currentImage = &lowResImage;
 
+   std::chrono::high_resolution_clock clock;
+   std::chrono::high_resolution_clock::time_point prev_time = clock.now();
    while (!glfwWindowShouldClose(window))
    {
       ImGui_ImplOpenGL3_NewFrame();
@@ -282,6 +293,14 @@ void LaunchUI(RayTracer * rt, Image * image )
 //      ImGui::ShowDemoWindow();
       bool resetRender = false;
       ImGui::Begin("window");
+      
+      std::chrono::high_resolution_clock::time_point current_time = clock.now();
+      std::chrono::milliseconds elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - prev_time);
+      prev_time = current_time;
+
+//      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Text("%.3f ms/frame ", elapsed.count()/1000.0f);
+      ImGui::Text("Current num samples %i", currentImage->mNumSamples);
       if (ImGui::Checkbox("Include Light", &rt->mIncludeLight)) {
          resetRender = true;
       }
@@ -328,10 +347,17 @@ void LaunchUI(RayTracer * rt, Image * image )
       }
       if (ImGui::SliderFloat("Aperture", &rt->mCamera.mAperture, 0, 1)) {
          resetRender = true;
-      }  
+      }
+      if (ImGui::SliderFloat("Shutter Speed", &rt->mCamera.mShutterSpeed, 0, 1)) {
+         resetRender = true;
+      }      
       if (ImGui::SliderFloat("Fov", &rt->mCamera.mFov, 15, 135)) {
          resetRender = true;
       }
+      if (ImGui::SliderInt("Bounces", &rt->mMaxBounces, 1, 50)) {
+         resetRender = true;
+      }
+      
       ImGui::End();
 
       handeInput(window);
@@ -342,11 +368,27 @@ void LaunchUI(RayTracer * rt, Image * image )
       rt->mCamera.mLookFrom[1] = mCamdistance*mLookatZ;;
 
       rt->mCamera.updateCamera();
-      rt->RayTraceScene(*image, 1, !mCameraMoved && !resetRender);
-      mCameraMoved = false;
-      createTexture(image);
+ //     int nsamples = 1;
+      if (mCameraMoved) {
+//         nsamples = 1;
+         mUseLowRes = true;
+         currentImage = &lowResImage;
+      }
+     
+      else if (lowResImage.mNumSamples >= 250) {
+         mUseLowRes = false;
+         if (currentImage == &lowResImage) {
+            currentImage = image;
+            resetRender = true;
+         }
+      }
 
-      timer += .1;
+      rt->rayTraceScene(*currentImage, 1, !mCameraMoved && !resetRender);
+      createTexture(*currentImage);
+
+      mCameraMoved = false;
+
+      timer += .1f;
       float ratio;
       int width, height;
       mat4x4 m, p, mvp;
@@ -365,7 +407,7 @@ void LaunchUI(RayTracer * rt, Image * image )
       {
 #define BUFFER_OFFSET(i) ((void*)(i))
          glActiveTexture(GL_TEXTURE0);
-         glBindTexture(GL_TEXTURE_2D, image->mGlID);
+         glBindTexture(GL_TEXTURE_2D, currentImage->mGlID);
          glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
          glEnableVertexAttribArray(0);
          glEnableVertexAttribArray(1);

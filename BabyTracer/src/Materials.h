@@ -8,12 +8,12 @@ public:
    {
 
    }
-   virtual bool Scatter(const Ray & r_in, const HitRecord & rec, glm::vec3 & attenuation, Ray & scattered)
+   virtual bool scatter(const Ray & r_in, const HitRecord & rec, glm::vec3 & attenuation, Ray & scattered)
    {
       if (1) 
       {
          glm::vec3 vDir= glm::normalize(r_in.mDir);
-         float val = 1.01 - glm::dot(-vDir, glm::normalize(rec.mNormal));
+         float val = 1.01f - glm::dot(-vDir, glm::normalize(rec.mNormal));
          float F0 = glm::mix(.04f, 1.0f, pow(val, 5.0));
          if (F0 > 1.0f) {
             // shouldn't happen
@@ -22,13 +22,13 @@ public:
          glm::vec3 reflected = reflect(vDir, rec.mNormal);
          glm::vec3 randomVec = random_in_unit_sphere();
 
-         scattered = Ray(rec.mPoint, glm::mix(rec.mNormal + randomVec, reflected + mRoughness*randomVec, F0));
+         scattered = Ray(rec.mPoint, glm::mix(rec.mNormal + randomVec, reflected + mRoughness*randomVec, F0),  r_in.mTime);
          attenuation = glm::mix(mAlbedo, glm::vec3(1,1,1), F0);
 
       }
       else 
       {
-         scattered = Ray(rec.mPoint, rec.mNormal + random_in_unit_sphere());
+         scattered = Ray(rec.mPoint, rec.mNormal + random_in_unit_sphere(), r_in.mTime);
          attenuation = mAlbedo;
       }
       //      scattered = Ray(rec.mPoint+ rec.mNormal, rec.mNormal);
@@ -39,13 +39,13 @@ public:
    
    virtual bool receivesShadows() { return true; };
 
-   virtual glm::vec3 ApplyLight(const glm::vec3 & lightDir, const glm::vec3 & lightColor, const Ray & r_in,  const HitRecord & rec)
+   virtual glm::vec3 applyLight(const glm::vec3 & lightDir, const glm::vec3 & lightColor, const Ray & r_in,  const HitRecord & rec)
    {
 
       glm::vec3 refl = reflect(lightDir, rec.mNormal);
       float specExp = exp2(9 * (1 - mRoughness) + 1);
       float specPower = glm::max(glm::dot(refl, r_in.mDir), 0.0f);
-      float F0 = .04;
+      float F0 = .04f;
       /*
       float val = 1.01 - glm::dot(-glm::normalize(r_in.mDir), glm::normalize(rec.mNormal));
       float F0 =  glm::mix(.04f, 1.0f, pow(val, 5.0));
@@ -75,18 +75,18 @@ public:
    {
 
    }
-   virtual bool Scatter(const Ray & r_in, const HitRecord & rec, glm::vec3 & attenuation, Ray & scattered)
+   virtual bool scatter(const Ray & r_in, const HitRecord & rec, glm::vec3 & attenuation, Ray & scattered)
    {
       glm::vec3 reflected = reflect(glm::normalize(r_in.mDir), rec.mNormal);
       
-      scattered = Ray(rec.mPoint, reflected+ mRoughness*random_in_unit_sphere());
+      scattered = Ray(rec.mPoint, reflected+ mRoughness*random_in_unit_sphere(), r_in.mTime);
       attenuation = mAlbedo;
       
 
       return (glm::dot(scattered.mDir, rec.mNormal) > 0);
    }
 
-   virtual glm::vec3 ApplyLight(const glm::vec3 & lightDir, const glm::vec3 & lightColor,  const Ray & r_in, const HitRecord & rec)
+   virtual glm::vec3 applyLight(const glm::vec3 & lightDir, const glm::vec3 & lightColor,  const Ray & r_in, const HitRecord & rec)
    {
       glm::vec3 refl = reflect(lightDir, rec.mNormal);
 
@@ -111,7 +111,7 @@ public:
    {
 
    }
-   virtual bool Scatter(const Ray & r_in, const HitRecord & rec, glm::vec3 & attenuation, Ray & scattered)
+   virtual bool scatter(const Ray & r_in, const HitRecord & rec, glm::vec3 & attenuation, Ray & scattered)
    {
       glm::vec3 outward_normal;
       glm::vec3 reflected = reflect(r_in.mDir, rec.mNormal);
@@ -135,21 +135,21 @@ public:
          reflect_prob = schlick(cosine, mRef_idx);
       }
       else {
-         scattered = Ray(rec.mPoint, reflected);
+         scattered = Ray(rec.mPoint, reflected, r_in.mTime);
          reflect_prob = 1.0;
       }
 
       float rand_num = drand48();
       if (rand_num < reflect_prob) {
-         scattered = Ray(rec.mPoint, reflected);
+         scattered = Ray(rec.mPoint, reflected,r_in.mTime);
       }
       else {
-         scattered = Ray(rec.mPoint, refracted);
+         scattered = Ray(rec.mPoint, refracted, r_in.mTime);
       }
       return true;
    }
    
-   virtual glm::vec3 ApplyLight(const glm::vec3 & lightDir, const glm::vec3 & lightColor, const Ray & r_in, const HitRecord & rec)
+   virtual glm::vec3 applyLight(const glm::vec3 & lightDir, const glm::vec3 & lightColor, const Ray & r_in, const HitRecord & rec)
    {
       glm::vec3 refl = reflect(lightDir, rec.mNormal);
       float spec = ((128 + 8) / 8.0f)*pow(glm::max(glm::dot(refl, r_in.mDir), 0.0f), 1.0 * 128);
@@ -159,8 +159,31 @@ public:
       return lightColor*(spec);
    }
 
-   virtual bool CastsShadows() { return false; }
+   virtual bool castsShadows() { return false; }
    virtual bool receivesShadows() { return false; };
    float mRef_idx;
+};
+
+class EmissiveMat : public Material
+{
+public:
+   EmissiveMat(const glm::vec3& albedo) : mAlbedo(albedo)
+   {
+      mEmissivity = albedo;
+   }
+   virtual bool scatter(const Ray & r_in, const HitRecord & rec, glm::vec3 & attenuation, Ray & scattered)
+   {
+      attenuation = mAlbedo;
+      return false;
+   }
+
+   virtual glm::vec3 applyLight(const glm::vec3 & lightDir, const glm::vec3 & lightColor, const Ray & r_in, const HitRecord & rec)
+   {
+      return glm::vec3(0,0,0);
+   }
+
+   glm::vec3 mAlbedo;
+   virtual bool receivesShadows() { return false; };
+   virtual bool castsShadows() { return true; }
 };
 

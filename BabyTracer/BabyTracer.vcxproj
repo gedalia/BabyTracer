@@ -142,6 +142,7 @@
       <PreprocessorDefinitions>_GLFW_WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>.\glm-0.9.9.2\glm;.\glfw-3.2.1\include;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -151,9 +152,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="BaseClasses.h" />
-    <ClInclude Include="Camera.h" />
-    <ClInclude Include="Image.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_glfw.h" />
@@ -161,9 +159,12 @@
     <ClInclude Include="imgui\imstb_rectpack.h" />
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
-    <ClInclude Include="Materials.h" />
-    <ClInclude Include="MathUtils.h" />
-    <ClInclude Include="Sphere.h" />
+    <ClInclude Include="src\AAPlanes.h" />
+    <ClInclude Include="src\BaseClasses.h" />
+    <ClInclude Include="src\Materials.h" />
+    <ClInclude Include="src\MathUtils.h" />
+    <ClInclude Include="src\Sphere.h" />
+    <ClInclude Include="src\Camera.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>

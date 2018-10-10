@@ -9,12 +9,31 @@ struct Ray
    Ray(): mOrigin(0,0,0), mDir(0,0,0){
       ;
    }
-   Ray(const glm::vec3 & start, const glm::vec3 & dir) : mOrigin(start), mDir(dir) {
+   Ray(const glm::vec3 & start, const glm::vec3 & dir, float time = 0.0f) : mOrigin(start), mDir(dir), mTime(time) {
       ;
    }
    glm::vec3 mOrigin;
    glm::vec3 mDir;
+   float mTime;
    glm::vec3 point_at_parameter(float t) const { return mOrigin + t*mDir; }
+};
+
+struct AABoundingBox
+{
+   AABoundingBox()
+   {
+      mMin = glm::vec3(0, 0, 0);
+      mMax = glm::vec3(0, 0, 0);
+   }
+
+   AABoundingBox(float x0, float x1, float y0, float y1) : mMin(x0, y0, 0), mMax(x1, y1, 0) {
+
+   }
+   AABoundingBox(const glm::vec3 & minval, const glm::vec3 & maxval ) : mMin(minval), mMax(maxval) {
+
+   }
+   glm::vec3 mMin;
+   glm::vec3 mMax;
 };
 
 class Camera
@@ -22,7 +41,7 @@ class Camera
 public:
    Camera() { ; }
    Camera(const glm::vec3 & lookfrom, const glm::vec3 & lookat, const glm::vec3 & vup, float vfov, float aspect,
-      float aperture)
+      float aperture, float shutterSpeed = 0.0f)
    {
       mLookFrom = lookfrom;
       mLookAt = lookat;
@@ -30,6 +49,7 @@ public:
       mFov = vfov;
       mAspect = aspect;
       mAperture = aperture;
+      mShutterSpeed = shutterSpeed;
       updateCamera();
    }
 
@@ -55,7 +75,14 @@ public:
       glm::vec3 offset = u*rd[0] + v*rd[1];
       glm::vec3 direction = lower_left_corner + s*horz + t*vert - origin - offset;
       direction = glm::normalize(direction);
-      return Ray(origin + offset, direction);
+      float rayTime = 0;
+      if (drand48() > .5) {
+         rayTime = mShutterSpeed;
+      }
+      else {
+         rayTime = mShutterSpeed*drand48();
+      }
+      return Ray(origin + offset, direction, rayTime);
    }
 
    glm::vec3 mLookFrom;
@@ -64,6 +91,7 @@ public:
    float mAperture;
    float mFov;
    float mAspect;
+   float mShutterSpeed;
 
 private:
    glm::vec3 lower_left_corner;
