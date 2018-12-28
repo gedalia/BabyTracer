@@ -25,7 +25,10 @@ void RayTracer::rayTraceScene(Image &image, int num_samples, bool accumulate_sam
    }*/
 
    {
+#ifdef NDEBUG
 #pragma omp parallel for
+#endif // !1
+
     
       for (int i = 0; i < image.mWidth; i+= chunk_size)
       {
@@ -91,17 +94,17 @@ glm::vec3 RayTracer::colorFunction(const Ray & ray, const HitableList & world, i
       glm::vec3 attenuation;
       glm::vec3 GI = glm::vec3(0, 0, 0);
 
-      if (bounces < mMaxBounces && rec.mMaterial->scatter(ray, rec, attenuation, scattered)) {
+      if (bounces < mMaxBounces && rec.mObject->getMaterial()->scatter(ray, rec, attenuation, scattered)) {
          GI = attenuation*colorFunction(scattered, world, hits, bounces + 1);
       }
       
-      GI += rec.mMaterial->mEmissivity;
+      rec.mObject->getMaterial()->emissivity(ray, rec, GI);
 
       glm::vec3 light_contrib(0, 0, 0);
       if (mIncludeLight && bounces < 3)
       {
          bool addLight = true;
-         if (rec.mMaterial->receivesShadows())
+         if (rec.mObject->getMaterial()->receivesShadows())
          {
             // shadows
             HitRecord shadow_rec;
@@ -113,7 +116,7 @@ glm::vec3 RayTracer::colorFunction(const Ray & ray, const HitableList & world, i
 
          if (addLight)
          {
-            light_contrib = rec.mMaterial->applyLight(mLightDir, mLightColor, ray, rec);
+            light_contrib = rec.mObject->getMaterial()->applyLight(mLightDir, mLightColor, ray, rec);
          }
       }
 
@@ -124,7 +127,8 @@ glm::vec3 RayTracer::colorFunction(const Ray & ray, const HitableList & world, i
    {
       glm::vec3 unit_dir = glm::normalize(ray.mDir);
       float t = 0.5f*(unit_dir[1] + 1.0f);
-         return glm::mix(glm::vec3(1.0, 1.0, 1.0), mSkyColor, t);
+      float max_brightness = max(max(mSkyColor[0], mSkyColor[1]), mSkyColor[2]);
+         return glm::mix(glm::vec3(max_brightness, max_brightness, max_brightness), mSkyColor, t);
       //return glm::mix(glm::vec3(1.0, 1.0, 1.0), glm::vec3(1., .5, .2), t);
    }
    return glm::vec3(0.01, 0.01, 0.01);

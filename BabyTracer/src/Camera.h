@@ -12,6 +12,8 @@ struct Ray
    Ray(const glm::vec3 & start, const glm::vec3 & dir, float time = 0.0f) : mOrigin(start), mDir(dir), mTime(time) {
       ;
    }
+   inline const glm::vec3 & origin() const { return mOrigin; }
+   inline const glm::vec3 & direction() const { return mDir; }
    glm::vec3 mOrigin;
    glm::vec3 mDir;
    float mTime;
@@ -50,12 +52,17 @@ public:
       mAspect = aspect;
       mAperture = aperture;
       mShutterSpeed = shutterSpeed;
+      mOverrideFocus = false;
+      mFocusDistOverride = 0;
       updateCamera();
    }
 
    void updateCamera()
    {
       float dist_to_focus = glm::length(mLookFrom - mLookAt);
+      if (mOverrideFocus) {
+         dist_to_focus = mOverrideFocus;
+      }
       mLensRadius = mAperture / 2.0f;
       float theta = mFov*M_PI / 180.0f;
       float half_height = tan(theta / 2.0f);
@@ -76,11 +83,14 @@ public:
       glm::vec3 direction = lower_left_corner + s*horz + t*vert - origin - offset;
       direction = glm::normalize(direction);
       float rayTime = 0;
-      if (drand48() > .5) {
-         rayTime = mShutterSpeed;
-      }
-      else {
-         rayTime = mShutterSpeed*drand48();
+      if (mShutterSpeed > 0)
+      {
+         if (drand48() > .5) {
+            rayTime = mShutterSpeed;
+         }
+         else {
+            rayTime = mShutterSpeed * drand48();
+         }
       }
       return Ray(origin + offset, direction, rayTime);
    }
@@ -100,5 +110,8 @@ private:
    glm::vec3 origin;
    glm::vec3 u, v, w;
    float mLensRadius;
+   bool mOverrideFocus;
+   float mFocusDistOverride;
+
 };
 

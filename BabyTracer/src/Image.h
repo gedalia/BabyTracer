@@ -28,7 +28,7 @@ public:
          }
       }
    }
-
+	Image(const char * fname);
    void saveToPPM(const char * fname) const;
 
    Pixel * toPixelData() ;

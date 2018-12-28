@@ -1,7 +1,10 @@
 #include "MathUtils.h"
 #include <glm/glm.hpp>
+#include <vector>
 
-glm::vec3 random_in_unit_sphere() {
+glm::vec3 random_in_unit_sphere() 
+{
+   /*
    glm::vec3 p;
    float dotval = 0;
    do {
@@ -9,14 +12,50 @@ glm::vec3 random_in_unit_sphere() {
       dotval = glm::dot(p, p);
    } while (dotval >= 1.0f);
    return p;
+   */   static thread_local std::vector<glm::vec3> random_numbers;
+   static thread_local int last_int = 0;
+   if (random_numbers.size() == 0)
+   {
+      random_numbers.reserve(10000);
+      while (random_numbers.size() < 10000) {
+         glm::vec3 p;
+         float dotval = 0;
+         do {
+            p = 2.0f*glm::vec3(drand48(), drand48(), drand48()) - glm::vec3(1.0, 1.0, 1.0);
+            dotval = glm::dot(p, p);
+         } while (dotval >= 1.0f);
+         random_numbers.push_back(glm::normalize(p));
+      }
+   }
+   if (last_int >= random_numbers.size()) {
+      last_int = (int)(drand48() * 1000);
+   }
+   return random_numbers[last_int++];
+
 }
 
-glm::vec3 random_in_unit_disk() {
-   glm::vec3 p;
-   do {
-      p = 2.0f*glm::vec3(drand48(), drand48(), 0) - glm::vec3(1.0, 1.0, 0.0);
-   } while (glm::dot(p,p) >= 1.0f);
-   return p;
+glm::vec3 random_in_unit_disk() 
+{
+   static thread_local std::vector<glm::vec3> random_numbers;
+   static thread_local int last_int = 0;
+   if (random_numbers.size() == 0)
+   {
+      random_numbers.reserve(10000);
+      while (random_numbers.size() < 10000)
+      {
+         glm::vec3 p;
+         do {
+            p = 2.0f*glm::vec3(drand48(), drand48(), 0) - glm::vec3(1.0, 1.0, 0.0);
+         } while (glm::dot(p, p) >= 1.0f);
+
+         random_numbers.push_back(p);
+      }
+   }
+
+   if (last_int >= random_numbers.size()) {
+      last_int = (int)(drand48() * 1000);
+   }
+   return random_numbers[last_int++];
 }
 
 glm::vec3 reflect(const glm::vec3 & v, const glm::vec3 & n) {

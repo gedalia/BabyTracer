@@ -11,10 +11,16 @@
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 
+#include "CV_SDK/cvmarkersobj.h"
+using namespace Concurrency::diagnostic;
+
 #include "glfw-3.2.1/deps/linmath.h"
 
 #include "Image.h"
 #include "BaseClasses.h"
+#include "Materials.h"
+#include "ConstantMedium.h"
+#include "Sphere.h"
 
 struct MyVertex
 {
@@ -60,6 +66,15 @@ static const char* fragment_shader_text =
 
 void createTexture(Image & image)
 {
+   marker_series series;
+   Pixel * pixel_data = nullptr;
+   {
+      span rtspan(series, _T("toPixelData"));
+      pixel_data = image.toPixelData();
+   }
+
+   span rtspan(series, _T("createTexture"));
+
    if (image.mGlID == 0) {
       glGenTextures(1, &image.mGlID);
    }
@@ -71,7 +86,6 @@ void createTexture(Image & image)
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
    // load and generate the texture
 
-   Pixel * pixel_data = image.toPixelData();
    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.mWidth, image.mHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, (unsigned char*)&pixel_data[0].rgb[0]);
    glGenerateMipmap(GL_TEXTURE_2D);
  
@@ -85,7 +99,7 @@ static void error_callback(int error, const char* description)
 
 
 //static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-void handeInput(GLFWwindow *window)
+void handeInput(GLFWwindow *window, RayTracer * rt)
 {
    ImGuiIO& io = ImGui::GetIO();
    if(io.KeysDown[ImGuiKey_Escape]){
@@ -105,34 +119,59 @@ void handeInput(GLFWwindow *window)
       }
    }
    if (io.KeysDown['A']  ) {
-      mLookatAngle -= .1;
+      mLookatAngle -= .1f;
       mCameraMoved = true;
    }
    if (io.KeysDown['D']  ) {
-      mLookatAngle += .1;
+      mLookatAngle += .1f;
       mCameraMoved = true;
    }
    if(io.KeysDown['W']  ) {
-      mLookatZ += .1;
+      mLookatZ += .1f;
       mCameraMoved = true;
    }
    if (io.KeysDown['S']) {
-      mLookatZ -= .1;
+      mLookatZ -= .1f;
       mCameraMoved = true;
    }
-// mouse
+   if (io.KeysDown['Q']) {
+      mCamdistance -= .1;
+      mCameraMoved = true;
+   }
+   if (io.KeysDown['E']) {
+      mCamdistance += .1;
+      mCameraMoved = true;
+   }
+   // mouse
 
-   if (!io.WantCaptureMouse && io.MouseDown[0]) {
-      mLookatAngle += .001*io.MouseDelta.x;
-      mLookatZ += .01*io.MouseDelta.y;
-      if (mLookatZ < 0) {
-         mLookatZ = 0;
+   if (!io.WantCaptureMouse)
+   {
+      if (io.MouseDown[0])
+      {
+         if (fabs(io.MouseDelta.x) || fabs(io.MouseDelta.y))
+         {
+            mLookatAngle += .001*io.MouseDelta.x;
+            mLookatZ += .01*io.MouseDelta.y;
+            if (mLookatZ < 0) {
+               mLookatZ = 0;
+            }
+            mCameraMoved = true;
+         }
       }
-      mCameraMoved = true;
-   }
-   if (io.MouseWheel) {
-      mCamdistance += .1*io.MouseWheel;
-       mCameraMoved = true;
+
+      else if (io.MouseClicked[0])
+      {
+         glm::vec3 origin(rt->mCamera.mLookFrom);
+         HitRecord rec;
+         rt->mWorld.hit(Ray(rt->mCamera.mLookFrom, glm::vec3(0, 1, 0)), 0, 100000, false, rec);
+
+      }
+
+      if (io.MouseWheel)
+      {
+         mCamdistance += .1*io.MouseWheel;
+         mCameraMoved = true;
+      }
    }
 }
 
@@ -290,7 +329,7 @@ void LaunchUI(RayTracer * rt, Image * image)
       ImGui_ImplGlfw_NewFrame();
       ImGui::NewFrame();
 
-//      ImGui::ShowDemoWindow();
+      //ImGui::ShowDemoWindow();
       bool resetRender = false;
       ImGui::Begin("window");
       
@@ -299,7 +338,7 @@ void LaunchUI(RayTracer * rt, Image * image)
       prev_time = current_time;
 
 //      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-      ImGui::Text("%.3f ms/frame ", elapsed.count()/1000.0f);
+      ImGui::Text("%i ms/frame ", elapsed.count());
       ImGui::Text("Current num samples %i", currentImage->mNumSamples);
       if (ImGui::Checkbox("Include Light", &rt->mIncludeLight)) {
          resetRender = true;
@@ -330,7 +369,8 @@ void LaunchUI(RayTracer * rt, Image * image)
       if(ImGui::Checkbox("Include SkyLight", &rt->mIncludeSkyLight)) {
          resetRender = true;
       }
-      if (rt->mIncludeSkyLight) {
+      if (rt->mIncludeSkyLight) 
+      {
          if (ImGui::CollapsingHeader("Sky Settings")) {
             float skycolor[3];
             skycolor[0] = rt->mSkyColor[0];
@@ -345,27 +385,133 @@ void LaunchUI(RayTracer * rt, Image * image)
 
          }
       }
-      if (ImGui::SliderFloat("Aperture", &rt->mCamera.mAperture, 0, 1)) {
-         resetRender = true;
-      }
-      if (ImGui::SliderFloat("Shutter Speed", &rt->mCamera.mShutterSpeed, 0, 1)) {
-         resetRender = true;
-      }      
-      if (ImGui::SliderFloat("Fov", &rt->mCamera.mFov, 15, 135)) {
-         resetRender = true;
-      }
       if (ImGui::SliderInt("Bounces", &rt->mMaxBounces, 1, 50)) {
          resetRender = true;
       }
+      if (ImGui::CollapsingHeader("Camera Settings"))
+      {
+         if (ImGui::SliderFloat("Aperture", &rt->mCamera.mAperture, 0, 1)) {
+            resetRender = true;
+         }
+         if (ImGui::SliderFloat("Shutter Speed", &rt->mCamera.mShutterSpeed, 0, 1)) {
+            resetRender = true;
+         }
+         if (ImGui::SliderFloat("Fov", &rt->mCamera.mFov, 15, 135)) {
+            resetRender = true;
+         }
+         if (ImGui::SliderFloat("LookAt X", &rt->mCamera.mLookAt[0], -5, 5)) {
+            resetRender = true;
+         }
+         if (ImGui::SliderFloat("LookAt Y", &rt->mCamera.mLookAt[1], -5, 5)) {
+            resetRender = true;
+         }
+         if (ImGui::SliderFloat("LookAt Z", &rt->mCamera.mLookAt[2], -5, 5)) {
+            resetRender = true;
+         }
+      }
       
+      static int listbox_item_current = 1;
+      if (ImGui::CollapsingHeader("Objects"))
+      {
+
+         ImGui::BeginChild("Child1", ImVec2(150, 0));// , false);
+
+          
+         std::vector<const char*> names;
+         for (int i = 0; i< rt->mWorld.mList.size(); i++) {
+            names.push_back(rt->mWorld.mList[i]->className());
+         }
+
+         ImGui::PushItemWidth(150);
+         ImGui::ListBox("", &listbox_item_current, &names[0], names.size());
+         ImGui::PopItemWidth();
+         ImGui::EndChild();
+         
+         ImGui::SameLine();
+
+         //ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5.0f);
+         ImGui::BeginChild("Child2", ImVec2(250, 250),true);//);// , ImVec2(0, 300), true);
+
+         if (ImGui::Checkbox("Visible", &rt->mWorld.mList[listbox_item_current]->mVisible)) {
+            resetRender = true;
+         }
+
+         if (rt->mWorld.mList[listbox_item_current]->mVisible)
+         {
+            ConstantMedium* medium = dynamic_cast<ConstantMedium*>(rt->mWorld.mList[listbox_item_current]);
+            if (medium)
+            {
+               if (ImGui::SliderFloat("Density", &medium->mDensity, 0, 1)) {
+                  resetRender = true;
+               }
+            }
+            ConstantMedium* cm = dynamic_cast<ConstantMedium*>(rt->mWorld.mList[listbox_item_current]);
+
+            Sphere* sphere = dynamic_cast<Sphere*>(rt->mWorld.mList[listbox_item_current]);
+            if (cm) 
+            {
+               sphere = dynamic_cast<Sphere*>(cm->mBoundry);
+            }
+            if (sphere)
+            {
+               float radius = sphere->getRadius();
+               if (ImGui::SliderFloat("Radius", &radius, 0, radius > 10 ? radius : 10)) {
+                  sphere->setRadius(radius);
+                  resetRender = true;
+               }
+               if (ImGui::SliderFloat3("Center", &sphere->mCenter[0],-10,10)) {
+                  resetRender = true;
+               }
+            }
+            Material * mat = rt->mWorld.mList[listbox_item_current]->getMaterial();
+            Lambertian * lam = dynamic_cast<Lambertian*>(mat);
+            Metal * metal = dynamic_cast<Metal*>(mat);
+            Isotropic * iso = dynamic_cast<Isotropic*>(mat);
+            EmissiveMat * emm = dynamic_cast<EmissiveMat*>(mat);
+
+            if (emm) 
+            {
+               if (ImGui::SliderFloat("Multiplier", &emm->mTextureMultiplier, .01, 20)) {
+                  resetRender = true;
+               }
+            }
+
+            ConstantTexture* color = NULL;
+            float alb[3];
+            color = dynamic_cast<ConstantTexture*>(mat->mAlbedo);
+            if (color) 
+            {
+               if (ImGui::ColorPicker3("Albedo Color", &color->mColor[0]))
+               {
+                  resetRender = true;
+               }
+            }
+         
+            if (lam)
+            {
+               if (ImGui::SliderFloat("Roughness", &lam->mRoughness, 0, 1)) {
+                  resetRender = true;
+               }
+            }
+
+            if (metal)
+            {
+               if (ImGui::SliderFloat("Roughness", &metal->mRoughness, 0,1)) {
+                  resetRender = true;
+               }
+            }
+            
+         }
+         ImGui::EndChild();
+      }
       ImGui::End();
 
-      handeInput(window);
-
+      handeInput(window, rt);
+      
 
       rt->mCamera.mLookFrom[0] = mCamdistance*cos(mLookatAngle);
       rt->mCamera.mLookFrom[2] = mCamdistance*sin(mLookatAngle);
-      rt->mCamera.mLookFrom[1] = mCamdistance*mLookatZ;;
+      rt->mCamera.mLookFrom[1] = mCamdistance*mLookatZ;
 
       rt->mCamera.updateCamera();
  //     int nsamples = 1;

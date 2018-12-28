@@ -4,8 +4,12 @@
 
 using namespace std;
 
+#include "CV_SDK/cvmarkersobj.h"
+using namespace Concurrency::diagnostic;
+
 Pixel * Image::toPixelData()
 {
+
    if (!mPixelData) {
       mPixelData = new Pixel[mHeight*mWidth]();
    }
