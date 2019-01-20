@@ -13,19 +13,36 @@ Pixel * Image::toPixelData()
    if (!mPixelData) {
       mPixelData = new Pixel[mHeight*mWidth]();
    }
+
+   float sampInv = 1.0f / mNumSamples;
+
+   glm_f32vec4 numSampInv = _mm_set1_ps(sampInv);
+   glm_f32vec4 trans = _mm_set1_ps(255.99f);
    for (int j = 0; j < mHeight; j++)
    {
+#ifdef NDEBUG
+#pragma omp parallel for
+#endif 
       for (int i = 0; i < mWidth; i++)
       {
-         int r = 255.99f * sqrt(mData[i][j][0] / mNumSamples);
+         __m128 pSrc1 = _mm_set_ps(mData[i][j][0], mData[i][j][1], mData[i][j][2], 0);
+
+         glm_f32vec4 val = _mm_mul_ps(pSrc1, numSampInv);
+         val = _mm_sqrt_ps(val);
+         val = _mm_mul_ps(val, trans);
+
+         float result[4];
+         _mm_store_ps(result, val);
+
+         int r = result[3];
          if (r > 255) {
             r = 255;
          }
-         int g = 255.99f * sqrt(mData[i][j][1] / mNumSamples);
+         int g = result[2];
          if (g > 255) {
             g = 255;
          }
-         int b = 255.99f * sqrt(mData[i][j][2]/mNumSamples);
+         int b = result[1];
          if (b > 255) {
             b = 255;
          }

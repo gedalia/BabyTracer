@@ -124,6 +124,7 @@ void CornellBox(HitableList &world)
 void PBRTester(HitableList &world)
 {
    world.add(new Sphere(glm::vec3(0, -1000, 0), 1000, new Lambertian(new ConstantTexture(glm::vec3(.5, .5, .5)), .9)));
+   world.add(new ConstantMedium(new Sphere(glm::vec3(0, 3.5, 3), 8, NULL), .9, new ConstantTexture(glm::vec3(1, 1, 1))));
 
    for (int i = 0; i < 10; i++) 
    {
@@ -153,8 +154,8 @@ int main()
  //  const int IMAGE_WIDTH = 1000;
  //  const int IMAGE_HEIGHT = 500;
 #ifdef _DEBUG
-   const int IMAGE_WIDTH = 250;
-   const int IMAGE_HEIGHT = 125;
+   const int IMAGE_WIDTH = 1000;
+   const int IMAGE_HEIGHT = 500;
 
 #else // DEBUG
    const int IMAGE_WIDTH = 1000;
@@ -169,15 +170,17 @@ int main()
    rt.mCamera = Camera(lookFrom, lookAt, glm::vec3(0, 1, 0), 70, float(IMAGE_WIDTH) / float(IMAGE_HEIGHT), aperture);
 
    //RandomScene(rt.mWorld);
-
+/*
    rt.mWorld.add(new Sphere(glm::vec3(0, -1000, 0), 1000, new Lambertian(new ConstantTexture(glm::vec3(.5, .5, .5)), .9)));
-   rt.mWorld.add(new Box(glm::vec3(2,0, 0), glm::vec3(4, 2, 2), new Metal(glm::vec3(.7, .6, .5), 0.0)));
+   rt.mWorld.add(new Sphere(glm::vec3(-3, 1, 0), 1.0, new Lambertian(new ConstantTexture(glm::vec3(.28, .55, .24)), .3)));
+   /*rt.mWorld.add(new Box(glm::vec3(2, 0, 0), glm::vec3(4, 2, 2), new Metal(glm::vec3(.7, .6, .5), 0.0)));
    rt.mWorld.add(new ConstantMedium(new Sphere(glm::vec3(0, 0, 0), 8, NULL), .01, new ConstantTexture(glm::vec3(1, 1, 1))));
    rt.mWorld.add(new Sphere(glm::vec3(-3, 1, 0), 1.0, new Lambertian(new ConstantTexture(glm::vec3(.28, .55, .24)), .3)));
    rt.mWorld.add(new Sphere(glm::vec3(0, 1, 0), 1.0, new Dielectric(1.5)));
    rt.mWorld.add(new Sphere(glm::vec3(0, 6, 1), .9, new EmissiveMat(10.0f,glm::vec3(1.1, 1, 1))));
+*/
 
-   //CornellBox(rt.mWorld);
+   CornellBox(rt.mWorld);
 
    //PBRTester(rt.mWorld);
 

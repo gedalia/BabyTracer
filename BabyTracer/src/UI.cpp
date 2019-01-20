@@ -530,8 +530,14 @@ void LaunchUI(RayTracer * rt, Image * image)
       }
 
       rt->rayTraceScene(*currentImage, 1, !mCameraMoved && !resetRender);
-      createTexture(*currentImage);
-
+      // don't update every frame
+      static int counter = 0;
+      counter++;
+      if (counter == 10 || io.MouseDown[0] || resetRender)
+      {
+         createTexture(*currentImage);
+         counter = 0;
+      }
       mCameraMoved = false;
 
       timer += .1f;
